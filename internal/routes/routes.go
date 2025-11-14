@@ -23,6 +23,9 @@ type allRoutes struct {
 func Load(log *zap.Logger, r *gin.Engine) {
 	log = log.Named("routes")
 	defer log.Sugar().Info("Loaded all API Routes")
+
+	r.LoadHTMLGlob("templates/*")
+
 	route := &Route{Name: "/", Engine: r}
 	route.Init(r)
 	Type := reflect.TypeOf(&allRoutes{log})
