@@ -23,9 +23,9 @@ func start(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 	if len(config.ValueOf.AllowedUsers) != 0 && !utils.Contains(config.ValueOf.AllowedUsers, chatId) {
-		ctx.Reply(u, "You are not allowed to use this bot.", nil)
+		ctx.Reply(u, "Você não tem permissão para usar este bot.", nil)
 		return dispatcher.EndGroups
 	}
-	ctx.Reply(u, "Hi, send me any file to get a direct streamble link to that file.", nil)
+	ctx.Reply(u, "Olá, envie-me qualquer arquivo para que eu possa obter um link direto para ele.", nil)
 	return dispatcher.EndGroups
 }
