@@ -43,7 +43,7 @@ func supportedMediaFilter(m *types.Message) (bool, error) {
 }
 
 
-func sendLink(ctx *ext.Context, u *ext.Update) error
+func sendLink(ctx *ext.Context, u *ext.Update) error { // <-- CHAVE DE ABERTURA ADICIONADA AQUI
 	chatId := u.EffectiveChat().GetID()
 	peerChatId := ctx.PeerStorage.GetPeerById(chatId)
 	if peerChatId.Type != int(storage.TypeUser) {
@@ -98,8 +98,8 @@ func sendLink(ctx *ext.Context, u *ext.Update) error
 		messageID,
 		hash,
 		file.MimeType,
-		fileNameEncoded, 
-		fileSizeStr,   
+		fileNameEncoded,
+		fileSizeStr,
 	)
 
 	
@@ -114,10 +114,10 @@ func sendLink(ctx *ext.Context, u *ext.Update) error
 		},
 	}
 	
-	if strings.Contains(file.MimeType, "video") || strings.Contains(file.MimeType, "audio") { 
+	if strings.Contains(file.MimeType, "video") || strings.Contains(file.MimeType, "audio") {
 		row.Buttons = append(row.Buttons, &tg.KeyboardButtonURL{
 			Text: "PlayerWEB",
-			URL:  playerLink, 
+			URL:  playerLink,
 		})
 	}
 
@@ -125,7 +125,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error
 	markup := &tg.ReplyInlineMarkup{
 		Rows: []tg.KeyboardButtonRow{row},
 	}
-	if strings.Contains(downloadLink, "http://localhost") { 
+	if strings.Contains(downloadLink, "http://localhost") {
 		_, err = ctx.Reply(u, text, &ext.ReplyOpts{
 			NoWebpage:        false,
 			ReplyToMessageId: u.EffectiveMessage.ID,
