@@ -1,3 +1,4 @@
+// player.go
 package routes
 
 import (
@@ -31,16 +32,16 @@ func formatBytes(b int64) string {
 func (a *allRoutes) handlePlayerPage(c *gin.Context) {
 	messageID := c.Param("messageID")
 	hash := c.Query("hash")
-	mimeType := c.Query("mime")
+	// mimeType := c.Query("mime") // ◄◄◄ REMOVA ESTA LINHA
 
 	if messageID == "" || hash == "" {
 		c.String(http.StatusBadRequest, "Link inválido ou expirado.")
 		return
 	}
 
-	if mimeType == "" {
-		mimeType = "video/mp4"
-	}
+	// if mimeType == "" { // ◄◄◄ REMOVA ESTA
+	// 	mimeType = "video/mp4" // ◄◄◄ REMOVA ESTA
+	// } // ◄◄◄ REMOVA ESTA
 
 	// ▼▼▼ INÍCIO DAS MODIFICAÇÕES ▼▼▼
 
@@ -62,7 +63,7 @@ func (a *allRoutes) handlePlayerPage(c *gin.Context) {
 	c.HTML(http.StatusOK, "player.html", gin.H{
 		"StreamURL":   streamURL,
 		"DownloadURL": downloadURL,
-		"MimeType":    mimeType,
+		// "MimeType":    mimeType, // ◄◄◄ REMOVA ESTA LINHA
 		"FileName":    fileName,
 		"FileSize":    fileSizeFormatted,
 	})
