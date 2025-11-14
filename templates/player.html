@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player de Vídeo</title>
+
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+
+    <style>
+        :root {
+            --plyr-color-main: #00a0e8;
+            --cor-fundo: #0e1118;
+            --cor-cartao: #1c212e;
+            --cor-texto: #c9d1d9;
+            --cor-texto-secundario: #8b949e;
+            --cor-borda: #30363d;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: var(--cor-fundo);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: var(--cor-texto);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container-principal {
+            width: 100%;
+            max-width: 800px; /* Largura máxima do player e cartão */
+            margin: 20px;
+        }
+
+        /* O player Plyr */
+        .plyr-container {
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--cor-borda);
+        }
+
+        /* Cartão de informações abaixo do player */
+        .info-card {
+            background-color: var(--cor-cartao);
+            border: 1px solid var(--cor-borda);
+            border-radius: 8px;
+            margin-top: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-card h2 {
+            margin: 0 0 16px 0;
+            padding: 0;
+            font-size: 1.4em;
+            font-weight: 600;
+            border-bottom: 1px solid var(--cor-borda);
+            padding-bottom: 10px;
+            word-break: break-all; /* Quebra nomes de arquivo longos */
+        }
+
+        .botoes-acao {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border: 1px solid var(--cor-borda);
+            background-color: #2a303c;
+            color: var(--cor-texto);
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #3a404c;
+        }
+
+        .btn .material-symbols-outlined {
+            font-size: 20px;
+        }
+
+        /* Detalhes do arquivo */
+        .detalhes-lista {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .detalhes-lista li {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 0.95em;
+        }
+
+        .detalhes-lista li + li {
+            border-top: 1px solid var(--cor-borda);
+        }
+
+        .detalhes-lista strong {
+            color: var(--cor-texto-secundario);
+            font-weight: 500;
+            margin-right: 10px;
+        }
+
+        .detalhes-lista span {
+            color: var(--cor-texto);
+            text-align: right;
+            word-break: break-all;
+        }
+
+        /* Responsividade para telas menores */
+        @media (max-width: 600px) {
+            .container-principal {
+                margin: 10px;
+            }
+            .info-card {
+                padding: 15px;
+            }
+            .info-card h2 {
+                font-size: 1.2em;
+            }
+            .botoes-acao {
+                flex-direction: column; /* Botões um em cima do outro */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-principal">
+        
+        <h1 style="text-align: center; font-weight: 300; color: var(--cor-texto-secundario);">
+            File Stream Bot
+        </h1>
+
+        <div class="plyr-container">
+            <video id="player" playsinline controls>
+                <source src="{{ .StreamURL }}" type="{{ .MimeType }}" />
+            </video>
+        </div>
+
+        <div class="info-card">
+            <h2>{{ .FileName }}</h2>
+
+            <div class="botoes-acao">
+                <a href="{{ .DownloadURL }}" class="btn" download>
+                    <span class="material-symbols-outlined">download</span>
+                    Baixar
+                </a>
+                <button class="btn" id="copy-link-btn">
+                    <span class="material-symbols-outlined">link</span>
+                    Copiar Link
+                </button>
+            </div>
+
+            <ul class="detalhes-lista">
+                <li>
+                    <strong>Nome do Arquivo:</strong>
+                    <span>{{ .FileName }}</span>
+                </li>
+                <li>
+                    <strong>Tamanho:</strong>
+                    <span>{{ .FileSize }}</span>
+                </li>
+                </ul>
+        </div>
+    </div>
+
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    <script>
+        // Inicializa o player Plyr
+        const player = new Plyr('#player', {
+            // Opções do Plyr aqui (se necessário)
+        });
+
+        // Script para o botão "Copiar Link"
+        const copyButton = document.getElementById('copy-link-btn');
+        copyButton.addEventListener('click', () => {
+            // Usamos o link de download, pois é o link direto
+            const linkToCopy = "{{ .DownloadURL }}";
+            
+            // Se o link for relativo (ex: /stream/...), transforma em absoluto
+            const absoluteLink = new URL(linkToCopy, window.location.origin).href;
+
+            navigator.clipboard.writeText(absoluteLink).then(() => {
+                copyButton.innerHTML = '<span class="material-symbols-outlined">done</span> Copiado!';
+                setTimeout(() => {
+                    copyButton.innerHTML = '<span class="material-symbols-outlined">link</span> Copiar Link';
+                }, 2000);
+            }).catch(err => {
+                console.error('Falha ao copiar link: ', err);
+                copyButton.innerText = 'Erro ao copiar';
+            });
+        });
+    </script>
+</body>
+</html>
