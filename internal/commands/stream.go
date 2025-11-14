@@ -3,6 +3,8 @@ package commands
 import (
 	"fmt"
 	"strings"
+	"net/url"
+	"strconv"
 
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/utils"
@@ -40,14 +42,15 @@ func supportedMediaFilter(m *types.Message) (bool, error) {
 	}
 }
 
-func sendLink(ctx *ext.Context, u *ext.Update) error {
+
+func sendLink(ctx *ext.Context, u *ext.Update) error
 	chatId := u.EffectiveChat().GetID()
 	peerChatId := ctx.PeerStorage.GetPeerById(chatId)
 	if peerChatId.Type != int(storage.TypeUser) {
 		return dispatcher.EndGroups
 	}
 	if len(config.ValueOf.AllowedUsers) != 0 && !utils.Contains(config.ValueOf.AllowedUsers, chatId) {
-		ctx.Reply(u, "You are not allowed to use this bot.", nil)
+		ctx.Reply(u, "Você não tem permissão para usar este bot.", nil)
 		return dispatcher.EndGroups
 	}
 	supported, err := supportedMediaFilter(u.EffectiveMessage)
@@ -55,7 +58,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		return err
 	}
 	if !supported {
-		ctx.Reply(u, "Sorry, this message type is unsupported.", nil)
+		ctx.Reply(u, "Desculpe, este tipo de mensagem não é suportado.", nil)
 		return dispatcher.EndGroups
 	}
 	update, err := utils.ForwardMessages(ctx, chatId, config.ValueOf.LogChannelID, u.EffectiveMessage.ID)
@@ -78,26 +81,51 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		file.ID,
 	)
 	hash := utils.GetShortHash(fullHash)
-	link := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
-	text := []styling.StyledTextOption{styling.Code(link)}
+
+	// ▼▼▼ INÍCIO DAS MODIFICAÇÕES ▼▼▼
+
+	// Link de download direto
+	downloadLink := fmt.Sprintf("%s/stream/%d?hash=%s&d=true", config.ValueOf.Host, messageID, hash)
+	
+	// Preparar dados para o link do player
+	fileNameEncoded := url.QueryEscape(file.FileName)
+	fileSizeStr := strconv.FormatInt(file.FileSize, 10)
+
+	// Link para o player WEB (AGORA COM MAIS DADOS)
+	playerLink := fmt.Sprintf(
+		"%s/player/%d?hash=%s&mime=%s&filename=%s&filesize=%s",
+		config.ValueOf.Host,
+		messageID,
+		hash,
+		file.MimeType,
+		fileNameEncoded, 
+		fileSizeStr,   
+	)
+
+	
+	text := []styling.StyledTextOption{styling.Code(downloadLink)}
+	
 	row := tg.KeyboardButtonRow{
 		Buttons: []tg.KeyboardButtonClass{
 			&tg.KeyboardButtonURL{
-				Text: "Download",
-				URL:  link + "&d=true",
+				Text: "Baixar",
+				URL:  downloadLink,
 			},
 		},
 	}
-	if strings.Contains(file.MimeType, "video") || strings.Contains(file.MimeType, "audio") || strings.Contains(file.MimeType, "pdf") {
+	
+	if strings.Contains(file.MimeType, "video") || strings.Contains(file.MimeType, "audio") { 
 		row.Buttons = append(row.Buttons, &tg.KeyboardButtonURL{
-			Text: "Stream",
-			URL:  link,
+			Text: "PlayerWEB",
+			URL:  playerLink, 
 		})
 	}
+
+
 	markup := &tg.ReplyInlineMarkup{
 		Rows: []tg.KeyboardButtonRow{row},
 	}
-	if strings.Contains(link, "http://localhost") {
+	if strings.Contains(downloadLink, "http://localhost") { 
 		_, err = ctx.Reply(u, text, &ext.ReplyOpts{
 			NoWebpage:        false,
 			ReplyToMessageId: u.EffectiveMessage.ID,
