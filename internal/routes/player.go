@@ -6,12 +6,12 @@ import (
 	"math"
 	"net/http"
 	"strconv"
-	"time"
 
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // LoadPlayerRoutes permanece o mesmo
@@ -56,53 +56,59 @@ func (a *allRoutes) handlePlayerPage(c *gin.Context) {
 	fileSize, _ := strconv.ParseInt(fileSizeStr, 10, 64)
 	fileSizeFormatted := formatBytes(fileSize)
 
-	// Tenta extrair ID do TMDB e buscar metadados (com timeout)
+	// Tenta extrair ID do TMDB e buscar metadados
 	metadata := ""
-	tmdbID, _ := utils.ExtractTMDBID(fileName)
+	log := a.log.Named("player")
+
+	log.Info("Iniciando busca de metadados", zap.String("fileName", fileName))
+
+	tmdbID, idStr := utils.ExtractTMDBID(fileName)
+	log.Info("TMDB ID extraído", zap.Int("tmdbID", tmdbID), zap.String("idStr", idStr))
 
 	if tmdbID > 0 && config.ValueOf.TMDBAPIKey != "" {
-		// Usa goroutine com timeout para evitar travar
-		done := make(chan string, 1)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					a.log.Sugar().Error("Erro ao buscar TMDB:", r)
-					done <- ""
-				}
-			}()
+		log.Info("Buscando metadados no TMDB", zap.Int("tmdbID", tmdbID))
+		
+		if utils.IsEpisode(fileName) {
+			log.Info("Detectado como episódio")
+			season, episode := utils.ExtractSeasonEpisode(fileName)
+			log.Info("Season e episode extraídos", zap.Int("season", season), zap.Int("episode", episode))
 
-			if utils.IsEpisode(fileName) {
-				season, episode := utils.ExtractSeasonEpisode(fileName)
-				if show, err := utils.GetTVShowInfo(tmdbID, config.ValueOf.TMDBAPIKey); err == nil {
-					if ep, err := utils.GetEpisodeInfo(tmdbID, season, episode, config.ValueOf.TMDBAPIKey); err == nil {
-						done <- utils.FormatEpisodeMetadata(show, ep, season, episode)
-					} else {
-						a.log.Sugar().Debug("Erro ao buscar episódio:", err)
-						done <- ""
-					}
-				} else {
-					a.log.Sugar().Debug("Erro ao buscar série:", err)
-					done <- ""
-				}
+			show, err := utils.GetTVShowInfo(tmdbID, config.ValueOf.TMDBAPIKey)
+			if err != nil {
+				log.Error("Erro ao buscar série", zap.Error(err))
 			} else {
-				if movie, err := utils.GetMovieInfo(tmdbID, config.ValueOf.TMDBAPIKey); err == nil {
-					done <- utils.FormatMovieMetadata(movie)
+				log.Info("Série encontrada", zap.String("showName", show.Name))
+				
+				ep, err := utils.GetEpisodeInfo(tmdbID, season, episode, config.ValueOf.TMDBAPIKey)
+				if err != nil {
+					log.Error("Erro ao buscar episódio", zap.Error(err))
 				} else {
-					a.log.Sugar().Debug("Erro ao buscar filme:", err)
-					done <- ""
+					log.Info("Episódio encontrado", zap.String("epName", ep.Name))
+					metadata = utils.FormatEpisodeMetadata(show, ep, season, episode)
+					log.Info("Metadados do episódio formatados")
 				}
 			}
-		}()
-
-		// Aguarda por 5 segundos no máximo
-		select {
-		case result := <-done:
-			metadata = result
-		case <-time.After(5 * time.Second):
-			a.log.Sugar().Warn("Timeout ao buscar metadados TMDB")
-			metadata = ""
+		} else {
+			log.Info("Detectado como filme")
+			movie, err := utils.GetMovieInfo(tmdbID, config.ValueOf.TMDBAPIKey)
+			if err != nil {
+				log.Error("Erro ao buscar filme", zap.Error(err))
+			} else {
+				log.Info("Filme encontrado", zap.String("movieTitle", movie.Title))
+				metadata = utils.FormatMovieMetadata(movie)
+				log.Info("Metadados do filme formatados")
+			}
+		}
+	} else {
+		if tmdbID == 0 {
+			log.Info("TMDB ID não encontrado no nome do arquivo")
+		}
+		if config.ValueOf.TMDBAPIKey == "" {
+			log.Info("TMDB_API_KEY não configurada")
 		}
 	}
+
+	log.Info("Renderizando player", zap.String("metadata", metadata))
 
 	// Renderiza o template HTML, passando os novos dados
 	c.HTML(http.StatusOK, "player.html", gin.H{
