@@ -3,8 +3,6 @@ package commands
 import (
 	"fmt"
 	"strings"
-	"net/url"
-	"strconv"
 
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/utils"
@@ -42,15 +40,14 @@ func supportedMediaFilter(m *types.Message) (bool, error) {
 	}
 }
 
-
-func sendLink(ctx *ext.Context, u *ext.Update) error { // <-- CHAVE DE ABERTURA ADICIONADA AQUI
+func sendLink(ctx *ext.Context, u *ext.Update) error {
 	chatId := u.EffectiveChat().GetID()
 	peerChatId := ctx.PeerStorage.GetPeerById(chatId)
 	if peerChatId.Type != int(storage.TypeUser) {
 		return dispatcher.EndGroups
 	}
 	if len(config.ValueOf.AllowedUsers) != 0 && !utils.Contains(config.ValueOf.AllowedUsers, chatId) {
-		ctx.Reply(u, "Você não tem permissão para usar este bot.", nil)
+		ctx.Reply(u, ext.ReplyTextString("Você não tem permissão para usar este bot."), nil)
 		return dispatcher.EndGroups
 	}
 	supported, err := supportedMediaFilter(u.EffectiveMessage)
@@ -58,20 +55,39 @@ func sendLink(ctx *ext.Context, u *ext.Update) error { // <-- CHAVE DE ABERTURA 
 		return err
 	}
 	if !supported {
-		ctx.Reply(u, "Desculpe, este tipo de mensagem não é suportado.", nil)
+		ctx.Reply(u, ext.ReplyTextString("Desculpe, este tipo de mensagem não é suportado."), nil)
 		return dispatcher.EndGroups
 	}
 	update, err := utils.ForwardMessages(ctx, chatId, config.ValueOf.LogChannelID, u.EffectiveMessage.ID)
 	if err != nil {
 		utils.Logger.Sugar().Error(err)
-		ctx.Reply(u, fmt.Sprintf("Error - %s", err.Error()), nil)
+		ctx.Reply(u, ext.ReplyTextString(fmt.Sprintf("Error - %s", err.Error())), nil)
 		return dispatcher.EndGroups
 	}
-	messageID := update.Updates[0].(*tg.UpdateMessageID).ID
-	doc := update.Updates[1].(*tg.UpdateNewChannelMessage).Message.(*tg.Message).Media
+	if len(update.Updates) < 2 {
+		ctx.Reply(u, ext.ReplyTextString("Erro - estrutura de atualização inesperada do Telegram"), nil)
+		return dispatcher.EndGroups
+	}
+	msgIDUpdate, ok := update.Updates[0].(*tg.UpdateMessageID)
+	if !ok {
+		ctx.Reply(u, ext.ReplyTextString("Erro - tipo de atualização inesperado"), nil)
+		return dispatcher.EndGroups
+	}
+	messageID := msgIDUpdate.ID
+	newMsg, ok := update.Updates[1].(*tg.UpdateNewChannelMessage)
+	if !ok {
+		ctx.Reply(u, ext.ReplyTextString("Erro - atualização de mensagem de canal inesperada"), nil)
+		return dispatcher.EndGroups
+	}
+	msg, ok := newMsg.Message.(*tg.Message)
+	if !ok {
+		ctx.Reply(u, ext.ReplyTextString("Erro - tipo de mensagem inesperado"), nil)
+		return dispatcher.EndGroups
+	}
+	doc := msg.Media
 	file, err := utils.FileFromMedia(doc)
 	if err != nil {
-		ctx.Reply(u, fmt.Sprintf("Error - %s", err.Error()), nil)
+		ctx.Reply(u, ext.ReplyTextString(fmt.Sprintf("Error - %s", err.Error())), nil)
 		return dispatcher.EndGroups
 	}
 	fullHash := utils.PackFile(
@@ -81,57 +97,32 @@ func sendLink(ctx *ext.Context, u *ext.Update) error { // <-- CHAVE DE ABERTURA 
 		file.ID,
 	)
 	hash := utils.GetShortHash(fullHash)
-
-	// ▼▼▼ INÍCIO DAS MODIFICAÇÕES ▼▼▼
-
-	// Link de download direto
-	downloadLink := fmt.Sprintf("%s/stream/%d?hash=%s&d=true", config.ValueOf.Host, messageID, hash)
-	
-	// Preparar dados para o link do player
-	fileNameEncoded := url.QueryEscape(file.FileName)
-	fileSizeStr := strconv.FormatInt(file.FileSize, 10)
-
-	// Link para o player WEB (AGORA COM MAIS DADOS)
-	playerLink := fmt.Sprintf(
-		"%s/player/%d?hash=%s&mime=%s&filename=%s&filesize=%s",
-		config.ValueOf.Host,
-		messageID,
-		hash,
-		file.MimeType,
-		fileNameEncoded,
-		fileSizeStr,
-	)
-
-	
-	text := []styling.StyledTextOption{styling.Code(downloadLink)}
-	
+	link := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
+	text := styling.Code(link)
 	row := tg.KeyboardButtonRow{
 		Buttons: []tg.KeyboardButtonClass{
 			&tg.KeyboardButtonURL{
-				Text: "Baixar",
-				URL:  downloadLink,
+				Text: "Download",
+				URL:  link + "&d=true",
 			},
 		},
 	}
-	
-	if strings.Contains(file.MimeType, "video") || strings.Contains(file.MimeType, "audio") {
+	if strings.Contains(file.MimeType, "video") || strings.Contains(file.MimeType, "audio") || strings.Contains(file.MimeType, "pdf") {
 		row.Buttons = append(row.Buttons, &tg.KeyboardButtonURL{
-			Text: "PlayerWEB",
-			URL:  playerLink,
+			Text: "Transmitir",
+			URL:  link,
 		})
 	}
-
-
 	markup := &tg.ReplyInlineMarkup{
 		Rows: []tg.KeyboardButtonRow{row},
 	}
-	if strings.Contains(downloadLink, "http://localhost") {
-		_, err = ctx.Reply(u, text, &ext.ReplyOpts{
+	if strings.Contains(link, "http://localhost") {
+		_, err = ctx.Reply(u, ext.ReplyTextStyledText(text), &ext.ReplyOpts{
 			NoWebpage:        false,
 			ReplyToMessageId: u.EffectiveMessage.ID,
 		})
 	} else {
-		_, err = ctx.Reply(u, text, &ext.ReplyOpts{
+		_, err = ctx.Reply(u, ext.ReplyTextStyledText(text), &ext.ReplyOpts{
 			Markup:           markup,
 			NoWebpage:        false,
 			ReplyToMessageId: u.EffectiveMessage.ID,
@@ -139,7 +130,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error { // <-- CHAVE DE ABERTURA 
 	}
 	if err != nil {
 		utils.Logger.Sugar().Error(err)
-		ctx.Reply(u, fmt.Sprintf("Error - %s", err.Error()), nil)
+		ctx.Reply(u, ext.ReplyTextString(fmt.Sprintf("Error - %s", err.Error())), nil)
 	}
 	return dispatcher.EndGroups
 }
