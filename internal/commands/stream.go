@@ -47,7 +47,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 	if len(config.ValueOf.AllowedUsers) != 0 && !utils.Contains(config.ValueOf.AllowedUsers, chatId) {
-		ctx.Reply(u, ext.ReplyTextString("You are not allowed to use this bot."), nil)
+		ctx.Reply(u, ext.ReplyTextString("Você não tem permissão para usar este bot."), nil)
 		return dispatcher.EndGroups
 	}
 	supported, err := supportedMediaFilter(u.EffectiveMessage)
@@ -55,7 +55,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		return err
 	}
 	if !supported {
-		ctx.Reply(u, ext.ReplyTextString("Sorry, this message type is unsupported."), nil)
+		ctx.Reply(u, ext.ReplyTextString("Desculpe, este tipo de mensagem não é suportado."), nil)
 		return dispatcher.EndGroups
 	}
 	update, err := utils.ForwardMessages(ctx, chatId, config.ValueOf.LogChannelID, u.EffectiveMessage.ID)
@@ -65,23 +65,23 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		return dispatcher.EndGroups
 	}
 	if len(update.Updates) < 2 {
-		ctx.Reply(u, ext.ReplyTextString("Error - unexpected update structure from Telegram"), nil)
+		ctx.Reply(u, ext.ReplyTextString("Erro - estrutura de atualização inesperada do Telegram"), nil)
 		return dispatcher.EndGroups
 	}
 	msgIDUpdate, ok := update.Updates[0].(*tg.UpdateMessageID)
 	if !ok {
-		ctx.Reply(u, ext.ReplyTextString("Error - unexpected update type"), nil)
+		ctx.Reply(u, ext.ReplyTextString("Erro - tipo de atualização inesperado"), nil)
 		return dispatcher.EndGroups
 	}
 	messageID := msgIDUpdate.ID
 	newMsg, ok := update.Updates[1].(*tg.UpdateNewChannelMessage)
 	if !ok {
-		ctx.Reply(u, ext.ReplyTextString("Error - unexpected channel message update"), nil)
+		ctx.Reply(u, ext.ReplyTextString("Erro - atualização de mensagem de canal inesperada"), nil)
 		return dispatcher.EndGroups
 	}
 	msg, ok := newMsg.Message.(*tg.Message)
 	if !ok {
-		ctx.Reply(u, ext.ReplyTextString("Error - unexpected message type"), nil)
+		ctx.Reply(u, ext.ReplyTextString("Erro - tipo de mensagem inesperado"), nil)
 		return dispatcher.EndGroups
 	}
 	doc := msg.Media
@@ -109,7 +109,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 	}
 	if strings.Contains(file.MimeType, "video") || strings.Contains(file.MimeType, "audio") || strings.Contains(file.MimeType, "pdf") {
 		row.Buttons = append(row.Buttons, &tg.KeyboardButtonURL{
-			Text: "Stream",
+			Text: "Transmitir",
 			URL:  link,
 		})
 	}
@@ -130,7 +130,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 	}
 	if err != nil {
 		utils.Logger.Sugar().Error(err)
-		ctx.Reply(u, ext.ReplyTextString(fmt.Sprintf("Error - %s", err.Error())), nil)
+		ctx.Reply(u, ext.ReplyTextString(fmt.Sprintf("Erro - %s", err.Error())), nil)
 	}
 	return dispatcher.EndGroups
 }
