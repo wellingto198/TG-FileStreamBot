@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"strings"
+	"net/url"
 
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/utils"
@@ -97,7 +98,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		file.ID,
 	)
 	hash := utils.GetShortHash(fullHash)
-	playerLink := fmt.Sprintf("%s/player/%d?hash=%s&filename=%s&filesize=%d", config.ValueOf.Host, messageID, hash, file.FileName, file.FileSize)
+	playerLink := fmt.Sprintf("%s/player/%d?hash=%s&filename=%s&filesize=%d", config.ValueOf.Host, messageID, hash, url.QueryEscape(file.FileName), file.FileSize)
 	streamLink := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
 	text := styling.Code(playerLink)
 	row := tg.KeyboardButtonRow{
