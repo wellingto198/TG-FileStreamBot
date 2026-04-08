@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/utils"
@@ -55,22 +56,51 @@ func (a *allRoutes) handlePlayerPage(c *gin.Context) {
 	fileSize, _ := strconv.ParseInt(fileSizeStr, 10, 64)
 	fileSizeFormatted := formatBytes(fileSize)
 
-	// Tenta extrair ID do TMDB e buscar metadados
+	// Tenta extrair ID do TMDB e buscar metadados (com timeout)
 	metadata := ""
 	tmdbID, _ := utils.ExtractTMDBID(fileName)
 
 	if tmdbID > 0 && config.ValueOf.TMDBAPIKey != "" {
-		if utils.IsEpisode(fileName) {
-			season, episode := utils.ExtractSeasonEpisode(fileName)
-			if show, err := utils.GetTVShowInfo(tmdbID, config.ValueOf.TMDBAPIKey); err == nil {
-				if ep, err := utils.GetEpisodeInfo(tmdbID, season, episode, config.ValueOf.TMDBAPIKey); err == nil {
-					metadata = utils.FormatEpisodeMetadata(show, ep, season, episode)
+		// Usa goroutine com timeout para evitar travar
+		done := make(chan string, 1)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					a.log.Sugar().Error("Erro ao buscar TMDB:", r)
+					done <- ""
+				}
+			}()
+
+			if utils.IsEpisode(fileName) {
+				season, episode := utils.ExtractSeasonEpisode(fileName)
+				if show, err := utils.GetTVShowInfo(tmdbID, config.ValueOf.TMDBAPIKey); err == nil {
+					if ep, err := utils.GetEpisodeInfo(tmdbID, season, episode, config.ValueOf.TMDBAPIKey); err == nil {
+						done <- utils.FormatEpisodeMetadata(show, ep, season, episode)
+					} else {
+						a.log.Sugar().Debug("Erro ao buscar episódio:", err)
+						done <- ""
+					}
+				} else {
+					a.log.Sugar().Debug("Erro ao buscar série:", err)
+					done <- ""
+				}
+			} else {
+				if movie, err := utils.GetMovieInfo(tmdbID, config.ValueOf.TMDBAPIKey); err == nil {
+					done <- utils.FormatMovieMetadata(movie)
+				} else {
+					a.log.Sugar().Debug("Erro ao buscar filme:", err)
+					done <- ""
 				}
 			}
-		} else {
-			if movie, err := utils.GetMovieInfo(tmdbID, config.ValueOf.TMDBAPIKey); err == nil {
-				metadata = utils.FormatMovieMetadata(movie)
-			}
+		}()
+
+		// Aguarda por 5 segundos no máximo
+		select {
+		case result := <-done:
+			metadata = result
+		case <-time.After(5 * time.Second):
+			a.log.Sugar().Warn("Timeout ao buscar metadados TMDB")
+			metadata = ""
 		}
 	}
 
