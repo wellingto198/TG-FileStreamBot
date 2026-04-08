@@ -97,7 +97,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		file.ID,
 	)
 	hash := utils.GetShortHash(fullHash)
-	playerLink := fmt.Sprintf("%s/player/%d?hash=%s", config.ValueOf.Host, messageID, hash)
+	playerLink := fmt.Sprintf("%s/player/%d?hash=%s&filename=%s&filesize=%d", config.ValueOf.Host, messageID, hash, file.FileName, file.FileSize)
 	streamLink := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
 	text := styling.Code(playerLink)
 	row := tg.KeyboardButtonRow{
