@@ -159,6 +159,10 @@
         <div class="info-card">
             <h2>{{ .FileName }}</h2>
 
+            {{ if .Metadata }}
+            <div style="background-color: #1c212e; padding: 15px; border-radius: 6px; margin-bottom: 16px; border-left: 3px solid #00a0e8; white-space: pre-wrap; font-size: 0.9em; line-height: 1.6;">{{ .Metadata }}</div>
+            {{ end }}
+
             <div class="botoes-acao">
                 <a href="{{ .DownloadURL }}" class="btn" download>
                     <span class="material-symbols-outlined">download</span>

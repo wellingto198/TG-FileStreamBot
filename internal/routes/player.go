@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"strconv" // <-- ADICIONAR
+	"strconv"
+
+	"EverythingSuckz/fsb/config"
+	"EverythingSuckz/fsb/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,40 +35,51 @@ func formatBytes(b int64) string {
 func (a *allRoutes) handlePlayerPage(c *gin.Context) {
 	messageID := c.Param("messageID")
 	hash := c.Query("hash")
-	// mimeType := c.Query("mime") // ◄◄◄ REMOVA ESTA LINHA
 
 	if messageID == "" || hash == "" {
 		c.String(http.StatusBadRequest, "Link inválido ou expirado.")
 		return
 	}
 
-	// if mimeType == "" { // ◄◄◄ REMOVA ESTA
-	// 	mimeType = "video/mp4" // ◄◄◄ REMOVA ESTA
-	// } // ◄◄◄ REMOVA ESTA
-
-	// ▼▼▼ INÍCIO DAS MODIFICAÇÕES ▼▼▼
-
 	// Constrói as URLs
 	streamURL := fmt.Sprintf("/stream/%s?hash=%s", messageID, hash)
-	downloadURL := fmt.Sprintf("%s&d=true", streamURL) // URL de download direto
+	downloadURL := fmt.Sprintf("%s&d=true", streamURL)
 
 	// Pega os novos dados da query
-	fileName := c.Query("filename") // Gin já decodifica o URL
+	fileName := c.Query("filename")
 	if fileName == "" {
-		fileName = "Vídeo" // Nome padrão
+		fileName = "Vídeo"
 	}
 
 	fileSizeStr := c.Query("filesize")
 	fileSize, _ := strconv.ParseInt(fileSizeStr, 10, 64)
-	fileSizeFormatted := formatBytes(fileSize) // Formata os bytes
+	fileSizeFormatted := formatBytes(fileSize)
+
+	// Tenta extrair ID do TMDB e buscar metadados
+	metadata := ""
+	tmdbID, _ := utils.ExtractTMDBID(fileName)
+
+	if tmdbID > 0 && config.ValueOf.TMDBAPIKey != "" {
+		if utils.IsEpisode(fileName) {
+			season, episode := utils.ExtractSeasonEpisode(fileName)
+			if show, err := utils.GetTVShowInfo(tmdbID, config.ValueOf.TMDBAPIKey); err == nil {
+				if ep, err := utils.GetEpisodeInfo(tmdbID, season, episode, config.ValueOf.TMDBAPIKey); err == nil {
+					metadata = utils.FormatEpisodeMetadata(show, ep, season, episode)
+				}
+			}
+		} else {
+			if movie, err := utils.GetMovieInfo(tmdbID, config.ValueOf.TMDBAPIKey); err == nil {
+				metadata = utils.FormatMovieMetadata(movie)
+			}
+		}
+	}
 
 	// Renderiza o template HTML, passando os novos dados
 	c.HTML(http.StatusOK, "player.html", gin.H{
 		"StreamURL":   streamURL,
 		"DownloadURL": downloadURL,
-		// "MimeType":    mimeType, // ◄◄◄ REMOVA ESTA LINHA
 		"FileName":    fileName,
 		"FileSize":    fileSizeFormatted,
+		"Metadata":    metadata,
 	})
-	// ▲▲▲ FIM DAS MODIFICAÇÕES ▲▲▲
 }
