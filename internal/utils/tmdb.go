@@ -39,9 +39,9 @@ type TMDBEpisode struct {
 }
 
 // ExtractTMDBID extrai o ID do TMDB do nome do arquivo
-// Formatos suportados: [tmdbid-12345] ou tmdbid-12345
+// Formatos suportados: [tmdbid-12345], tmdbid-12345, [tmdbid_12345], tmdbid_12345
 func ExtractTMDBID(filename string) (int, string) {
-	re := regexp.MustCompile(`\[?tmdbid-(\d+)\]?`)
+	re := regexp.MustCompile(`\[?tmdbid[-_](\d+)\]?`)
 	matches := re.FindStringSubmatch(filename)
 	if len(matches) > 1 {
 		id, err := strconv.Atoi(matches[1])
@@ -148,11 +148,7 @@ func FormatMovieMetadata(movie *TMDBMovie) string {
 		sb.WriteString(fmt.Sprintf("⭐ %.1f/10\n", movie.VoteAverage))
 	}
 	if movie.Overview != "" {
-		overview := movie.Overview
-		if len(overview) > 150 {
-			overview = overview[:150] + "..."
-		}
-		sb.WriteString(fmt.Sprintf("📝 %s", overview))
+		sb.WriteString(fmt.Sprintf("📝 %s", movie.Overview))
 	}
 	return sb.String()
 }
@@ -169,11 +165,7 @@ func FormatEpisodeMetadata(show *TMDBTVShow, episode *TMDBEpisode, season, ep in
 		sb.WriteString(fmt.Sprintf("⭐ %.1f/10\n", episode.VoteAverage))
 	}
 	if episode.Overview != "" {
-		overview := episode.Overview
-		if len(overview) > 150 {
-			overview = overview[:150] + "..."
-		}
-		sb.WriteString(fmt.Sprintf("📝 %s", overview))
+		sb.WriteString(fmt.Sprintf("📝 %s", episode.Overview))
 	}
 	return sb.String()
 }

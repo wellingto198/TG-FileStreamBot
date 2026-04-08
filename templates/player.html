@@ -160,7 +160,7 @@
             <h2>{{ .FileName }}</h2>
 
             {{ if .Metadata }}
-            <div style="background-color: #1c212e; padding: 15px; border-radius: 6px; margin-bottom: 16px; border-left: 3px solid #00a0e8; white-space: pre-wrap; font-size: 0.9em; line-height: 1.6;">{{ .Metadata }}</div>
+            <div id="metadata-container" style="background-color: #1c212e; padding: 15px; border-radius: 6px; margin-bottom: 16px; border-left: 3px solid #00a0e8; white-space: pre-wrap; font-size: 0.9em; line-height: 1.6;">{{ .Metadata }}</div>
             {{ end }}
 
             <div class="botoes-acao">
@@ -200,6 +200,48 @@
                 'fullscreen'
             ]
         });
+
+        // Processa metadados para truncar sinopse
+        const metadataContainer = document.getElementById('metadata-container');
+        if (metadataContainer) {
+            const text = metadataContainer.textContent;
+            const lines = text.split('\n');
+            let truncated = false;
+            const processedLines = lines.map(line => {
+                if (line.startsWith('📝 ') && line.length > 200) {
+                    const synopsis = line.substring(2); // Remove o emoji
+                    const shortSynopsis = synopsis.substring(0, 150) + '...';
+                    truncated = true;
+                    return '📝 ' + shortSynopsis + ' <a href="#" id="show-more" style="color: #00a0e8; text-decoration: none;">mais</a>';
+                }
+                return line;
+            });
+            metadataContainer.innerHTML = processedLines.join('\n');
+
+            // Adiciona evento ao link "mais"
+            const showMoreLink = document.getElementById('show-more');
+            if (showMoreLink) {
+                showMoreLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const fullText = text.split('\n').map(line => {
+                        if (line.startsWith('📝 ') && line.length > 200) {
+                            return line;
+                        }
+                        return line;
+                    }).join('\n');
+                    metadataContainer.innerHTML = fullText + ' <a href="#" id="show-less" style="color: #00a0e8; text-decoration: none;">menos</a>';
+                    
+                    // Adiciona evento ao link "menos"
+                    const showLessLink = document.getElementById('show-less');
+                    if (showLessLink) {
+                        showLessLink.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            metadataContainer.innerHTML = processedLines.join('\n');
+                        });
+                    }
+                });
+            }
+        }
 
         // Script para o botão "Copiar Link"
         const copyButton = document.getElementById('copy-link-btn');
