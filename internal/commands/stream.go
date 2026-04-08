@@ -117,7 +117,7 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 	markup := &tg.ReplyInlineMarkup{
 		Rows: []tg.KeyboardButtonRow{row},
 	}
-	if strings.Contains(link, "http://localhost") {
+	if strings.Contains(playerLink, "http://localhost") {
 		_, err = ctx.Reply(u, ext.ReplyTextStyledText(text), &ext.ReplyOpts{
 			NoWebpage:        false,
 			ReplyToMessageId: u.EffectiveMessage.ID,
