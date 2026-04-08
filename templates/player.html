@@ -187,7 +187,14 @@
     <script>
         // Inicializa o player Plyr
         const player = new Plyr('#player', {
-            // Opções do Plyr aqui (se necessário)
+            controls: [
+                'play',
+                'progress',
+                'current-time',
+                'duration',
+                'mute',
+                'fullscreen'
+            ]
         });
 
         // Script para o botão "Copiar Link"
