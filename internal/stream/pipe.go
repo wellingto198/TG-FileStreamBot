@@ -140,105 +140,75 @@ func (p *StreamPipe) Close() error {
 
 // prefetch runs in a goroutine, fetching blocks concurrently and sending to blockQueue.
 func (p *StreamPipe) prefetch() {
-	defer close(p.blockQueue)
+    defer close(p.blockQueue)
 
-	// calc block boundaries
-	alignedStart := p.start - (p.start % p.blockSize)
-	leftTrim := p.start - alignedStart
-	rightTrim := (p.end % p.blockSize) + 1
-	totalBlocks := int((p.end - alignedStart + p.blockSize) / p.blockSize)
+    alignedStart := p.start - (p.start % p.blockSize)
+    leftTrim := p.start - alignedStart
+    rightTrim := (p.end % p.blockSize) + 1
+    totalBlocks := int((p.end - alignedStart + p.blockSize) / p.blockSize)
 
-	currentBlock := 0
-	offset := alignedStart
+    currentBlock := 0
+    offset := alignedStart
 
-	for currentBlock < totalBlocks {
-		// check for cancellation
-		select {
-		case <-p.ctx.Done():
-			return
-		default:
-		}
+    for currentBlock < totalBlocks {
+        if p.ctx.Err() != nil {
+            return
+        }
 
-		// fetch a batch of blocks concurrently
-		batchSize := min(config.ValueOf.StreamConcurrency, totalBlocks-currentBlock)
-		blocks := make([][]byte, batchSize)
+        // Limitamos a concorrência para não saturar o buffer
+        batchSize := min(config.ValueOf.StreamConcurrency, totalBlocks-currentBlock)
+        blocks := make([][]byte, batchSize)
 
-		var wg sync.WaitGroup
-		var fetchErr error
-		var errMu sync.Mutex
+        var wg sync.WaitGroup
+        var fetchErr error
+        var errMu sync.Mutex
 
-		for i := range batchSize {
-			wg.Add(1)
-			go func(idx int) {
-				defer wg.Done()
+        for i := range batchSize {
+            wg.Add(1)
+            go func(idx int) {
+                defer wg.Done()
+                blockNum := currentBlock + idx
+                blockOffset := offset + int64(idx)*p.blockSize
 
-				blockNum := currentBlock + idx
-				blockOffset := offset + int64(idx)*p.blockSize
+                data, err := p.downloadBlockWithRetry(blockOffset)
+                if err != nil {
+                    errMu.Lock()
+                    fetchErr = err
+                    errMu.Unlock()
+                    return
+                }
 
-				data, err := p.downloadBlockWithRetry(blockOffset)
-				dataLen := int64(len(data))
+                // Ajuste de trimming mantido conforme sua lógica original
+                dataLen := int64(len(data))
+                if totalBlocks == 1 {
+                    data = data[min(leftTrim, dataLen):min(rightTrim, dataLen)]
+                } else if blockNum == 0 {
+                    data = data[min(leftTrim, dataLen):]
+                } else if blockNum == totalBlocks-1 {
+                    if dataLen > rightTrim {
+                        data = data[:rightTrim]
+                    }
+                }
+                blocks[idx] = data
+            }(i)
+        }
+        wg.Wait()
 
-				if err != nil {
-					errMu.Lock()
-					if fetchErr == nil {
-						fetchErr = err
-					}
-					errMu.Unlock()
-					return
-				}
+        if fetchErr != nil {
+            p.log.Error("prefetch batch failed", zap.Error(fetchErr))
+            return
+        }
 
-				// trim first/last block to exact range
-				if totalBlocks == 1 {
-					if dataLen < rightTrim {
-						rightTrim = dataLen
-					}
-					if leftTrim > dataLen {
-						leftTrim = dataLen
-					}
-					data = data[leftTrim:rightTrim]
-				} else if blockNum == 0 {
-					if leftTrim > dataLen {
-						leftTrim = dataLen
-					}
-					data = data[leftTrim:]
-				} else if blockNum == totalBlocks-1 {
-					if dataLen > rightTrim {
-						data = data[:rightTrim]
-					}
-				}
-
-				blocks[idx] = data
-			}(i)
-		}
-
-		wg.Wait()
-
-		// handle errors
-		// ignore context cancellation cuz it's expected on disconnect
-		if fetchErr != nil {
-			if p.ctx.Err() == nil {
-				p.log.Error("block download failed", zap.Error(fetchErr))
-			}
-			return
-		}
-
-		// send blocks to queue in order
-		for _, block := range blocks {
-			if block == nil {
-				// a fetch failure that wasn't captured, should not happen but just in case.
-				p.log.Error("unexpected nil block in batch, aborting prefetch")
-				return
-			}
-			select {
-			case p.blockQueue <- block:
-			case <-p.ctx.Done():
-				return
-			}
-		}
-
-		currentBlock += batchSize
-		offset += p.blockSize * int64(batchSize)
-	}
+        for _, block := range blocks {
+            select {
+            case p.blockQueue <- block:
+            case <-p.ctx.Done():
+                return
+            }
+        }
+        currentBlock += batchSize
+        offset += p.blockSize * int64(batchSize)
+    }
 }
 
 // downloadBlockWithRetry fetches a block with exponential backoff retry.
