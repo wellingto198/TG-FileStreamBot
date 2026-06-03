@@ -140,75 +140,77 @@ func (p *StreamPipe) Close() error {
 
 // prefetch runs in a goroutine, fetching blocks concurrently and sending to blockQueue.
 func (p *StreamPipe) prefetch() {
-    defer close(p.blockQueue)
+	defer close(p.blockQueue)
 
-    alignedStart := p.start - (p.start % p.blockSize)
-    leftTrim := p.start - alignedStart
-    rightTrim := (p.end % p.blockSize) + 1
-    totalBlocks := int((p.end - alignedStart + p.blockSize) / p.blockSize)
+	alignedStart := p.start - (p.start % p.blockSize)
+	leftTrim := p.start - alignedStart
+	rightTrim := (p.end % p.blockSize) + 1
+	totalBlocks := int((p.end - alignedStart + p.blockSize) / p.blockSize)
 
-    currentBlock := 0
-    offset := alignedStart
+	currentBlock := 0
+	offset := alignedStart
 
-    for currentBlock < totalBlocks {
-        if p.ctx.Err() != nil {
-            return
-        }
+	for currentBlock < totalBlocks {
+		if p.ctx.Err() != nil {
+			return
+		}
 
-        // Limitamos a concorrência para não saturar o buffer
-        batchSize := min(config.ValueOf.StreamConcurrency, totalBlocks-currentBlock)
-        blocks := make([][]byte, batchSize)
+		batchSize := min(config.ValueOf.StreamConcurrency, totalBlocks-currentBlock)
+		blocks := make([][]byte, batchSize)
 
-        var wg sync.WaitGroup
-        var fetchErr error
-        var errMu sync.Mutex
+		var wg sync.WaitGroup
+		var fetchErr error
+		var errMu sync.Mutex
 
-        for i := range batchSize {
-            wg.Add(1)
-            go func(idx int) {
-                defer wg.Done()
-                blockNum := currentBlock + idx
-                blockOffset := offset + int64(idx)*p.blockSize
+		for i := range batchSize {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				blockNum := currentBlock + idx
+				blockOffset := offset + int64(idx)*p.blockSize
 
-                data, err := p.downloadBlockWithRetry(blockOffset)
-                if err != nil {
-                    errMu.Lock()
-                    fetchErr = err
-                    errMu.Unlock()
-                    return
-                }
+				data, err := p.downloadBlockWithRetry(blockOffset)
+				if err != nil {
+					errMu.Lock()
+					fetchErr = err
+					errMu.Unlock()
+					return
+				}
 
-                // Ajuste de trimming mantido conforme sua lógica original
-                dataLen := int64(len(data))
-                if totalBlocks == 1 {
-                    data = data[min(leftTrim, dataLen):min(rightTrim, dataLen)]
-                } else if blockNum == 0 {
-                    data = data[min(leftTrim, dataLen):]
-                } else if blockNum == totalBlocks-1 {
-                    if dataLen > rightTrim {
-                        data = data[:rightTrim]
-                    }
-                }
-                blocks[idx] = data
-            }(i)
-        }
-        wg.Wait()
+				dataLen := int64(len(data))
+				if totalBlocks == 1 {
+					data = data[min(leftTrim, dataLen):min(rightTrim, dataLen)]
+				} else if blockNum == 0 {
+					data = data[min(leftTrim, dataLen):]
+				} else if blockNum == totalBlocks-1 {
+					if dataLen > rightTrim {
+						data = data[:rightTrim]
+					}
+				}
+				blocks[idx] = data
+			}(i)
+		}
+		wg.Wait()
 
-        if fetchErr != nil {
-            p.log.Error("prefetch batch failed", zap.Error(fetchErr))
-            return
-        }
+		if fetchErr != nil {
+			// Se o erro ocorreu porque o cliente desconectou (H27), saímos silenciosamente.
+			// Só logamos se for um erro real da API (ex: FloodWait, timeout interno, etc).
+			if p.ctx.Err() == nil {
+				p.log.Error("prefetch batch failed", zap.Error(fetchErr))
+			}
+			return
+		}
 
-        for _, block := range blocks {
-            select {
-            case p.blockQueue <- block:
-            case <-p.ctx.Done():
-                return
-            }
-        }
-        currentBlock += batchSize
-        offset += p.blockSize * int64(batchSize)
-    }
+		for _, block := range blocks {
+			select {
+			case p.blockQueue <- block:
+			case <-p.ctx.Done():
+				return
+			}
+		}
+		currentBlock += batchSize
+		offset += p.blockSize * int64(batchSize)
+	}
 }
 
 // downloadBlockWithRetry fetches a block with exponential backoff retry.
