@@ -100,6 +100,76 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 	hash := utils.GetShortHash(fullHash)
 	playerLink := fmt.Sprintf("%s/player/%d?hash=%s&filename=%s&filesize=%d", config.ValueOf.Host, messageID, hash, url.QueryEscape(file.FileName), file.FileSize)
 	streamLink := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
+	
+	downloadLink := streamLink + "&d=true"
+	text := styling.Code(downloadLink)
+	
+	row := tg.KeyboardButtonRow{
+		Buttons: []tg.KeyboardButtonClass{
+			&tg.KeyboardButtonURL{
+				Text: "Baixar",
+				URL:  downloadLink,
+			},
+		},
+	}
+	if strings.Contains(file.MimeType, "video") || strings.Contains(file.MimeType, "audio") || strings.Contains(file.MimeType, "pdf") {
+		row.Buttons = append(row.Buttons, &tg.KeyboardButtonURL{
+			Text: "PlayerWEB",
+			URL:  playerLink,
+		})
+	}
+	markup := &tg.ReplyInlineMarkup{
+		Rows: []tg.KeyboardButtonRow{row},
+	}
+	if strings.Contains(playerLink, "http://localhost") {
+		_, err = ctx.Reply(u, ext.ReplyTextStyledText(text), &ext.ReplyOpts{
+			NoWebpage:        false,
+			ReplyToMessageId: u.EffectiveMessage.ID,
+		})
+	} else {
+		_, err = ctx.Reply(u, ext.ReplyTextStyledText(text), &ext.ReplyOpts{
+			Markup:           markup,
+			NoWebpage:        false,
+			ReplyToMessageId: u.EffectiveMessage.ID,
+		})
+	}
+	if err != nil {
+		utils.Logger.Sugar().Error(err)
+		ctx.Reply(u, ext.ReplyTextString(fmt.Sprintf("Erro - %s", err.Error())), nil)
+	}
+	return dispatcher.EndGroups
+}
+	msgIDUpdate, ok := update.Updates[0].(*tg.UpdateMessageID)
+	if !ok {
+		ctx.Reply(u, ext.ReplyTextString("Erro - tipo de atualização inesperado"), nil)
+		return dispatcher.EndGroups
+	}
+	messageID := msgIDUpdate.ID
+	newMsg, ok := update.Updates[1].(*tg.UpdateNewChannelMessage)
+	if !ok {
+		ctx.Reply(u, ext.ReplyTextString("Erro - atualização de mensagem de canal inesperada"), nil)
+		return dispatcher.EndGroups
+	}
+	msg, ok := newMsg.Message.(*tg.Message)
+	if !ok {
+		ctx.Reply(u, ext.ReplyTextString("Erro - tipo de mensagem inesperado"), nil)
+		return dispatcher.EndGroups
+	}
+	doc := msg.Media
+	file, err := utils.FileFromMedia(doc)
+	if err != nil {
+		ctx.Reply(u, ext.ReplyTextString(fmt.Sprintf("Error - %s", err.Error())), nil)
+		return dispatcher.EndGroups
+	}
+	fullHash := utils.PackFile(
+		file.FileName,
+		file.FileSize,
+		file.MimeType,
+		file.ID,
+	)
+	hash := utils.GetShortHash(fullHash)
+	playerLink := fmt.Sprintf("%s/player/%d?hash=%s&filename=%s&filesize=%d", config.ValueOf.Host, messageID, hash, url.QueryEscape(file.FileName), file.FileSize)
+	streamLink := fmt.Sprintf("%s/stream/%d?hash=%s", config.ValueOf.Host, messageID, hash)
 	text := styling.Code(playerLink)
 	row := tg.KeyboardButtonRow{
 		Buttons: []tg.KeyboardButtonClass{
