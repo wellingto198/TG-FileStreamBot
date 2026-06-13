@@ -133,9 +133,29 @@ func getStreamRoute(ctx *gin.Context) {
 			return
 		}
 		defer pipe.Close()
-		if _, err := io.CopyN(w, pipe, contentLength); err != nil {
-			if !utils.IsClientDisconnectError(err) {
-				log.Error("Error while copying stream", zap.Error(err))
+
+		flusher, ok := w.(http.Flusher)
+		buf := make([]byte, 64*1024) // Buffer de 64KB para melhor throughput
+
+		for {
+			n, err := pipe.Read(buf)
+			if n > 0 {
+				if _, wErr := w.Write(buf[:n]); wErr != nil {
+					log.Error("Error writing to response", zap.Error(wErr))
+					return
+				}
+				if ok {
+					flusher.Flush() // Envia o pedaço lido imediatamente
+				}
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				if !utils.IsClientDisconnectError(err) {
+					log.Error("Error while streaming", zap.Error(err))
+				}
+				break
 			}
 		}
 	}
