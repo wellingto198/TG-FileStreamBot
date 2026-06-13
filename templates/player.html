@@ -12,11 +12,13 @@
     <style>
         :root {
             --plyr-color-main: #00a0e8;
-            --cor-fundo: #0e1118;
-            --cor-cartao: #1c212e;
-            --cor-texto: #c9d1d9;
-            --cor-texto-secundario: #8b949e;
-            --cor-borda: #30363d;
+            --cor-fundo: #000000;
+            --cor-cartao: #000000;
+            --cor-texto: #e6e6e6;
+            --cor-texto-secundario: #808080;
+            --cor-borda: #1a1a1a;
+            --cor-botao: #0a0a0a;
+            --cor-botao-hover: #141414;
         }
 
         body, html {
@@ -34,25 +36,23 @@
 
         .container-principal {
             width: 100%;
-            max-width: 800px; /* Largura máxima do player e cartão */
+            max-width: 800px;
             margin: 20px;
         }
 
-        /* O player Plyr */
         .plyr-container {
             border-radius: 8px;
             overflow: hidden;
             border: 1px solid var(--cor-borda);
         }
 
-        /* Cartão de informações abaixo do player */
         .info-card {
             background-color: var(--cor-cartao);
             border: 1px solid var(--cor-borda);
             border-radius: 8px;
             margin-top: 16px;
             padding: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            box-shadow: none; /* Removido para manter a profundidade flat do AMOLED */
         }
 
         .info-card h2 {
@@ -62,7 +62,7 @@
             font-weight: 600;
             border-bottom: 1px solid var(--cor-borda);
             padding-bottom: 10px;
-            word-break: break-all; /* Quebra nomes de arquivo longos */
+            word-break: break-all;
         }
 
         .botoes-acao {
@@ -78,7 +78,7 @@
             gap: 8px;
             padding: 10px 16px;
             border: 1px solid var(--cor-borda);
-            background-color: #2a303c;
+            background-color: var(--cor-botao);
             color: var(--cor-texto);
             text-decoration: none;
             border-radius: 6px;
@@ -88,14 +88,13 @@
         }
 
         .btn:hover {
-            background-color: #3a404c;
+            background-color: var(--cor-botao-hover);
         }
 
         .btn .material-symbols-outlined {
             font-size: 20px;
         }
 
-        /* Detalhes do arquivo */
         .detalhes-lista {
             list-style: none;
             padding: 0;
@@ -125,7 +124,6 @@
             word-break: break-all;
         }
 
-        /* Responsividade para telas menores */
         @media (max-width: 600px) {
             .container-principal {
                 margin: 10px;
@@ -137,7 +135,7 @@
                 font-size: 1.2em;
             }
             .botoes-acao {
-                flex-direction: column; /* Botões um em cima do outro */
+                flex-direction: column;
             }
         }
     </style>
@@ -160,7 +158,7 @@
             <h2>{{ .FileName }}</h2>
 
             {{ if .Metadata }}
-            <div id="metadata-container" style="background-color: #1c212e; padding: 15px; border-radius: 6px; margin-bottom: 16px; border-left: 3px solid #00a0e8; white-space: pre-wrap; font-size: 0.9em; line-height: 1.6;">{{ .Metadata }}</div>
+<div id="metadata-container" style="background-color: #0a0a0a; padding: 15px; border-radius: 6px; margin-bottom: 16px; border-left: 3px solid #00a0e8; white-space: pre-wrap; font-size: 0.9em; line-height: 1.6;">{{ .Metadata }}</div>
             {{ end }}
 
             <div class="botoes-acao">
