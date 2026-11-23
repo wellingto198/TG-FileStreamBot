@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gotd/td/tg"
 	range_parser "github.com/quantumsheep/range-parser"
@@ -44,9 +45,18 @@ func getStreamRoute(ctx *gin.Context) {
 
 	worker := bot.GetNextWorker()
 
-	file, err := utils.TimeFuncWithResult(log, "FileFromMessage", func() (*types.File, error) {
-		return utils.FileFromMessage(ctx, worker.Client, messageID)
-	})
+	var file *types.File
+	for attempt := 0; attempt < 5; attempt++ {
+		if attempt > 0 {
+			worker = bot.GetNextWorker()
+		}
+		file, err = utils.TimeFuncWithResult(log, "FileFromMessage", func() (*types.File, error) {
+			return utils.FileFromMessage(ctx, worker.Client, messageID)
+		})
+		if err == nil || !strings.Contains(err.Error(), "RPC_CALL_FAIL") {
+			break
+		}
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -63,7 +73,6 @@ func getStreamRoute(ctx *gin.Context) {
 		return
 	}
 
-	// for photo messages
 	if file.FileSize == 0 {
 		res, err := worker.Client.API().UploadGetFile(ctx, &tg.UploadGetFileRequest{
 			Location: file.Location,
@@ -135,7 +144,7 @@ func getStreamRoute(ctx *gin.Context) {
 		defer pipe.Close()
 
 		flusher, ok := w.(http.Flusher)
-		buf := make([]byte, 64*1024) // Buffer de 64KB para melhor throughput
+		buf := make([]byte, 64*1024)
 
 		for {
 			n, err := pipe.Read(buf)
@@ -145,7 +154,7 @@ func getStreamRoute(ctx *gin.Context) {
 					return
 				}
 				if ok {
-					flusher.Flush() // Envia o pedaço lido imediatamente
+					flusher.Flush()
 				}
 			}
 			if err == io.EOF {
