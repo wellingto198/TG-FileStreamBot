@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"EverythingSuckz/fsb/config"
 	"EverythingSuckz/fsb/internal/utils"
@@ -59,7 +60,16 @@ func sendLink(ctx *ext.Context, u *ext.Update) error {
 		ctx.Reply(u, ext.ReplyTextString("Desculpe, este tipo de mensagem não é suportado."), nil)
 		return dispatcher.EndGroups
 	}
-	update, err := utils.ForwardMessages(ctx, chatId, config.ValueOf.LogChannelID, u.EffectiveMessage.ID)
+	var update *tg.Updates
+	for attempt := 0; attempt < 5; attempt++ {
+		if attempt > 0 {
+			time.Sleep(1 * time.Second)
+		}
+		update, err = utils.ForwardMessages(ctx, chatId, config.ValueOf.LogChannelID, u.EffectiveMessage.ID)
+		if err == nil || !strings.Contains(err.Error(), "RPC_CALL_FAIL") {
+			break
+		}
+	}
 	if err != nil {
 		utils.Logger.Sugar().Error(err)
 		ctx.Reply(u, ext.ReplyTextString(fmt.Sprintf("Error - %s", err.Error())), nil)
